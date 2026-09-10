@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from student_template import my_authorial_sort
 from authorial import dpes_sort
 from classical import (
     bubble_sort,
@@ -164,7 +165,7 @@ def main():
         "Insertion Sort": insertion_sort,
         "Merge Sort": merge_sort,
         "Quick Sort": quick_sort,
-        "Authorial (DPES)": dpes_sort,
+        "Meu Algoritimo (SPGIS)": my_authorial_sort,
     }
 
     sizes = [10, 50, 100, 250, 500, 1000]
