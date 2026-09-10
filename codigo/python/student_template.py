@@ -31,21 +31,73 @@ def my_authorial_sort(arr: List[Any]) -> Tuple[List[Any], int, int]:
     moves = 0
 
     # =========================================================================
-    # TODO: Escreva sua lógica autoral aqui.
-    # Exemplo temporário (substitua pelo seu algoritmo):
+    # TODO: Consiste em realizar uma busca por meio de uma única estimativa interpolada.
+    # Após essa busca, uma correção linear é feita para garantir que o número seja colocado no index correto.
+
     for i in range(1, n):
         key = a[i]
         moves += 1
-        j = i - 1
-        while j >= 0:
+
+        minimum = a[0]
+        maximum = a[i - 1]
+
+        # 1. Verificação incial para definir minimo e máximo 
+        comps += 1
+
+        if key < minimum:
+            position = 0
+
+        else:
             comps += 1
-            if a[j] > key:
-                a[j + 1] = a[j]
-                moves += 1
-                j -= 1
+
+            if key >= maximum:
+                position = i
+
             else:
-                break
-        a[j + 1] = key
+                # 2. Interpolação e comparação com posição estimada uma única vez
+                calc = (key - minimum) / (maximum - minimum)
+                est = calc * (i - 1)
+                position = int(est + 0.5)
+
+                comps += 1
+                if key < a[position]:
+                    j = position
+
+                # 3. Correção para a esquerda
+                    while j > 0:
+                        comps += 1
+                        if a[j - 1] > key:
+                            j -= 1
+                        else:
+                            break
+
+                    position = j
+
+                else:
+                    j = position
+
+                # 4. Correção para a direita
+                    while j < i:
+                    
+                        comps += 1
+                        if a[j] <= key:
+                            j += 1
+                            
+                        else:
+                            break
+
+                    position = j
+            
+        # 5. Abrir espaço para inserir a key
+        j = i
+        
+        while (j > position):
+            a[j] = a[j - 1]
+            moves += 1
+            j -= 1
+            
+        # 6. Inserir key
+        a[position] = key
         moves += 1
     # =========================================================================
 
