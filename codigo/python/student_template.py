@@ -142,7 +142,60 @@ class TestStudentAuthorialSort(unittest.TestCase):
         res, _, _ = my_authorial_sort(data)
         self.assert_sorted(data, res)
 
+# =============================================================================
+# TESTES ADICIONAIS PARA CASOS ESPECÍFICOS DO ALGORITMO AUTORAL
+# =============================================================================
 
+    def test_outlier_high(self):
+        data = [1, 2, 3, 4, 5, 100000]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_outlier_low(self):
+        data = [-100000, 1, 2, 3, 4, 5]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_negative_and_outlier(self):
+        data = [-100, -10, 0, 2, 3, 1000]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_repeated_mixed(self):
+        data = [5, 2, 5, 1, 5, 2, 1]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_small_unsorted(self):
+        data = [9, 2, 7, 1, 5, 3]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_two_elements_reverse(self):
+        data = [2, 1]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_two_elements_equal(self):
+        data = [5, 5]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_many_negatives(self):
+        data = [-3, -10, -1, -7, -5, -2]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_large_gap_middle_value(self):
+        data = [1, 2, 3, 1000, 4, 5, 6]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+
+    def test_duplicates_with_negatives(self):
+        data = [0, -1, 5, -1, 3, 0, 5, -2]
+        res, _, _ = my_authorial_sort(data)
+        self.assert_sorted(data, res)
+        
 if __name__ == "__main__":
     print("🧪 Executando testes unitários no seu algoritmo autoral...")
     unittest.main(verbosity=2)
