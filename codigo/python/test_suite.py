@@ -15,6 +15,7 @@ from classical import (
     quick_sort,
     selection_sort,
 )
+from student_template import my_authorial_sort
 
 
 class BaseSortMixin:
@@ -121,6 +122,11 @@ class TestQuickSort(unittest.TestCase, BaseSortMixin):
 class TestAuthorialSort(unittest.TestCase, BaseSortMixin):
     sort_fn = staticmethod(dpes_sort)
     name = "Authorial Sort (DPES)"
+
+
+class TestStudentAuthorialSort(unittest.TestCase, BaseSortMixin):
+    sort_fn = staticmethod(my_authorial_sort)
+    name = "Student Authorial Sort (SPGIS)"
 
 
 if __name__ == "__main__":

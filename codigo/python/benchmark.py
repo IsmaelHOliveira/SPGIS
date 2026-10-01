@@ -5,14 +5,11 @@ Gera tabelas estatísticas em Markdown, CSV e gráficos comparativos PNG.
 
 import argparse
 from collections import defaultdict
+from html import escape
 import os
 import random
 import time
 from typing import Callable, Dict, List, Tuple
-
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 from student_template import my_authorial_sort
 from authorial import dpes_sort
@@ -61,7 +58,7 @@ def run_benchmark(
     results = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
 
     for dist in distributions:
-        print(f"\n📊 Executando benchmarks para distribuição: [{dist.upper()}]")
+        print(f"\nExecutando benchmarks para distribuição: [{dist.upper()}]")
         for size in sizes:
             print(f"  -> Tamanho N = {size}...")
             # Gera datasets fixos por repetição para garantir comparação justa
@@ -116,47 +113,123 @@ def print_markdown_summary(results: dict, sizes: List[int]):
             print("| " + " | ".join(row) + " |")
 
 
-def plot_benchmark_results(results: dict, output_path: str = "benchmark_results.png"):
-    """Gera gráficos de curvas de tempo e comparações usando matplotlib."""
+def print_moves_summary(results: dict, sizes: List[int]):
+    """Imprime uma tabela Markdown com as movimentações médias."""
+    for dist, algs in results.items():
+        print(f"\n### Resultados: Distribuição `{dist}` (Movimentações)")
+        header = "| Algoritmo | " + " | ".join(f"N={s}" for s in sizes) + " |"
+        sep = "| :--- | " + " | ".join(":---:" for _ in sizes) + " |"
+        print(header)
+        print(sep)
+        for alg_name, size_data in algs.items():
+            row = [alg_name]
+            for s in sizes:
+                row.append(f"{size_data[s]['moves']:.1f}" if s in size_data else "—")
+            print("| " + " | ".join(row) + " |")
+
+
+def _svg_line_chart(
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    title: str,
+    metric: str,
+    y_label: str,
+    algs: dict,
+    sizes: List[int],
+    colors: List[str],
+) -> str:
+    """Desenha um gráfico de linhas SVG sem bibliotecas externas."""
+    left, top, right, bottom = 62, 30, 16, 108
+    plot_width = width - left - right
+    plot_height = height - top - bottom
+    values = [data[metric] for data in algs.values() for data in data.values()]
+    y_max = max(values, default=1.0)
+    y_max = max(1.0, y_max * 1.1)
+
+    def px(index: int) -> float:
+        return x + left + (plot_width * index / max(1, len(sizes) - 1))
+
+    def py(value: float) -> float:
+        return y + top + plot_height - (value / y_max * plot_height)
+
+    parts = [
+        f'<g>',
+        f'<rect x="{x}" y="{y}" width="{width}" height="{height}" fill="#ffffff" stroke="#cbd5e1"/>',
+        f'<text x="{x + width / 2}" y="{y + 18}" text-anchor="middle" font-size="14" font-weight="bold">{escape(title)}</text>',
+    ]
+
+    for tick in range(6):
+        value = y_max * tick / 5
+        tick_y = py(value)
+        parts.append(f'<line x1="{x + left}" y1="{tick_y:.2f}" x2="{x + width - right}" y2="{tick_y:.2f}" stroke="#e2e8f0"/>')
+        parts.append(f'<text x="{x + left - 6}" y="{tick_y + 4:.2f}" text-anchor="end" font-size="10">{value:.0f}</text>')
+
+    parts.append(f'<line x1="{x + left}" y1="{y + top}" x2="{x + left}" y2="{y + top + plot_height}" stroke="#334155"/>')
+    parts.append(f'<line x1="{x + left}" y1="{y + top + plot_height}" x2="{x + width - right}" y2="{y + top + plot_height}" stroke="#334155"/>')
+    parts.append(f'<text x="{x + 14}" y="{y + top + plot_height / 2}" transform="rotate(-90 {x + 14} {y + top + plot_height / 2})" text-anchor="middle" font-size="11">{escape(y_label)}</text>')
+
+    for index, size in enumerate(sizes):
+        parts.append(f'<text x="{px(index):.2f}" y="{y + top + plot_height + 17}" text-anchor="middle" font-size="10">{size}</text>')
+    parts.append(f'<text x="{x + left + plot_width / 2}" y="{y + top + plot_height + 35}" text-anchor="middle" font-size="11">Tamanho da entrada (N)</text>')
+
+    for color_index, (name, size_data) in enumerate(algs.items()):
+        color = colors[color_index % len(colors)]
+        points = [(px(index), py(size_data[size][metric])) for index, size in enumerate(sizes) if size in size_data]
+        if not points:
+            continue
+        point_text = " ".join(f"{point_x:.2f},{point_y:.2f}" for point_x, point_y in points)
+        parts.append(f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{point_text}"/>')
+        for point_x, point_y in points:
+            parts.append(f'<circle cx="{point_x:.2f}" cy="{point_y:.2f}" r="3" fill="{color}"/>')
+        legend_x = x + 12 + (color_index % 2) * (width / 2)
+        legend_y = y + height - 48 + (color_index // 2) * 15
+        parts.append(f'<line x1="{legend_x}" y1="{legend_y}" x2="{legend_x + 14}" y2="{legend_y}" stroke="{color}" stroke-width="3"/>')
+        parts.append(f'<text x="{legend_x + 19}" y="{legend_y + 4}" font-size="10">{escape(name)}</text>')
+
+    parts.append('</g>')
+    return "".join(parts)
+
+
+def write_svg_benchmark_results(results: dict, output_path: str = "benchmark_results.svg"):
+    """Gera um gráfico SVG de tempo, comparações e movimentações sem matplotlib."""
+    base_path, extension = os.path.splitext(output_path)
+    if extension.lower() != ".svg":
+        output_path = f"{base_path}.svg"
+
+    chart_width, chart_height, row_height = 470, 310, 350
     distributions = list(results.keys())
-    fig, axes = plt.subplots(len(distributions), 2, figsize=(14, 4 * len(distributions)))
+    total_width = chart_width * 3
+    total_height = 50 + row_height * len(distributions)
+    # Paleta padrão do Matplotlib, preservando as cores do gráfico original.
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{total_width}" height="{total_height}" viewBox="0 0 {total_width} {total_height}">',
+        '<rect width="100%" height="100%" fill="#f8fafc"/>',
+        f'<text x="{total_width / 2}" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold">Benchmark de Algoritmos de Ordenação</text>',
+    ]
 
-    if len(distributions) == 1:
-        axes = [axes]
+    for row_index, distribution in enumerate(distributions):
+        row_y = 50 + row_index * row_height
+        algs = results[distribution]
+        sizes = sorted({size for size_data in algs.values() for size in size_data})
+        parts.append(f'<text x="12" y="{row_y + 14}" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Distribuição: {escape(distribution)}</text>')
+        parts.append(_svg_line_chart(0, row_y + 20, chart_width, chart_height - 20, "Tempo médio", "time_ms", "Tempo (ms)", algs, sizes, colors))
+        parts.append(_svg_line_chart(chart_width, row_y + 20, chart_width, chart_height - 20, "Comparações", "comps", "Comparações", algs, sizes, colors))
+        parts.append(_svg_line_chart(chart_width * 2, row_y + 20, chart_width, chart_height - 20, "Movimentações", "moves", "Movimentações", algs, sizes, colors))
 
-    for idx, dist in enumerate(distributions):
-        ax_time = axes[idx][0]
-        ax_comps = axes[idx][1]
-
-        for alg_name, size_map in results[dist].items():
-            sizes = sorted(size_map.keys())
-            times = [size_map[s]["time_ms"] for s in sizes]
-            comps = [size_map[s]["comps"] for s in sizes]
-
-            ax_time.plot(sizes, times, marker="o", label=alg_name)
-            ax_comps.plot(sizes, comps, marker="s", label=alg_name)
-
-        ax_time.set_title(f"Tempo de Execução (ms) — [{dist.title()}]")
-        ax_time.set_xlabel("Tamanho da Entrada (N)")
-        ax_time.set_ylabel("Tempo Médio (ms)")
-        ax_time.grid(True, linestyle="--", alpha=0.6)
-        ax_time.legend()
-
-        ax_comps.set_title(f"Número de Comparações — [{dist.title()}]")
-        ax_comps.set_xlabel("Tamanho da Entrada (N)")
-        ax_comps.set_ylabel("Comparações")
-        ax_comps.grid(True, linestyle="--", alpha=0.6)
-        ax_comps.legend()
-
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    print(f"\n🖼️ Gráfico salvo com sucesso em: {output_path}")
+    parts.append('</svg>')
+    with open(output_path, "w", encoding="utf-8") as svg_file:
+        svg_file.write("\n".join(parts))
+    print(f"\nGráfico SVG salvo com sucesso em: {output_path}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Benchmark de Algoritmos de Ordenação — APA")
     parser.add_argument("--trials", type=int, default=3, help="Número de repetições por teste")
-    parser.add_argument("--plot", type=str, default="benchmark_results.png", help="Caminho para salvar o gráfico")
+    parser.add_argument("--plot", type=str, default="benchmark_results.svg", help="Caminho para salvar o gráfico SVG")
     args = parser.parse_args()
 
     algorithms = {
@@ -174,7 +247,8 @@ def main():
     random.seed(42)
     results = run_benchmark(algorithms, sizes, distributions, trials=args.trials)
     print_markdown_summary(results, sizes)
-    plot_benchmark_results(results, args.plot)
+    print_moves_summary(results, sizes)
+    write_svg_benchmark_results(results, args.plot)
 
 
 if __name__ == "__main__":
